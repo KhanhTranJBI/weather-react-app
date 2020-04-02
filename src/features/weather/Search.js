@@ -1,10 +1,15 @@
-import React, {useState} from "react";
+import React, {useEffect, useRef, useState} from "react";
 import styles from "./Search.module.css";
+import {connect} from "react-redux";
+import fetchSearchSuggestion from "../../actions/SearchSuggestionActions";
+import fetchWeatherDetail from "../../actions/WeatherDetailActions";
+import {clickAddressAction} from "../../actions/SelectedAddressActions";
 
 const Search = props => {
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const {searchSuggestions, fetchSearchSuggestion, fetchWeatherDetail, selectedAddress, clickAddressAction} = props;
   const [showSuggestion, setShowSuggestion] = useState(false);
-  const [error, setError] = useState('');
+  const inputRef = useRef();
+  const [searchString, setSearchString] = useState('');
   
   const handleSearchClick = () => {
     setShowSuggestion(true);
@@ -16,57 +21,51 @@ const Search = props => {
     }, 200);
   };
   
-  const handleSearchChange = async (event) => {
-    const query = event.target.value;
-    if (query.length < 3) {
-      return;
-    }
-    try {
-      const response = await fetch(`https://api.weather.com/v3/location/search?apiKey=d522aa97197fd864d36b418f39ebb323&format=json&language=en-US&locationType=locale&query=${query}`);
-      const data = await response.json();
-      
-      setSearchSuggestions(data);
-      setError('');
-    } catch (e) {
-      setError('There is an error getting search suggestions');
-    }
-    setShowSuggestion(true);
-  };
+  useEffect(() => {
+    setTimeout(() => {
+      if (searchString === inputRef.current.value) {
+        fetchSearchSuggestion(searchString);
+        setShowSuggestion(true);
+      }
+    }, 500);
+  }, [searchString, fetchSearchSuggestion]);
   
   const handleSuggestionClick = async (event) => {
-    setSelectedAddress(event.target.textContent);
     const latitude = event.target.dataset.latitude;
     const longitude = event.target.dataset.longitude;
-    setShowSuggestion(false);
-    
-    try {
-      const response = await fetch(`https://api.weather.com/v2/turbo/vt1observation?apiKey=d522aa97197fd864d36b418f39ebb323&format=json&geocode=${latitude}%2C${longitude}&language=en-US&units=e`);
-      const data = await response.json();
-      
-      setWeatherDetail(data.vt1observation);
-      setError('');
-    } catch (e) {
-      setError(`There is an error getting weather of "${selectedAddress}"`);
-    }
-  };
   
-  const {setSelectedAddress, selectedAddress, setWeatherDetail} = props;
+    clickAddressAction(event.target.textContent);
+    setShowSuggestion(false);
+    fetchWeatherDetail(latitude, longitude);
+  };
   
   return (
     <>
       <div className={styles.autocomplete} onBlur={handleAutocompleteBlur}>
-        <input onClick={handleSearchClick} className={styles.search_input} onChange={handleSearchChange} type="text" placeholder="Search city or zip code" />
+        <input ref={inputRef} onClick={handleSearchClick} className={styles.search_input} onChange={event => setSearchString(event.target.value)} type="text" placeholder="Search city or zip code" />
         <div className={styles.autocomplete_items}>
-          {showSuggestion && searchSuggestions.location && searchSuggestions.location.address && (
-            searchSuggestions.location.address.map((address, i) => {
-              return <div onClick={handleSuggestionClick} key={searchSuggestions.location.placeId[i]} data-latitude={searchSuggestions.location.latitude[i]} data-longitude={searchSuggestions.location.longitude[i]} className={address === selectedAddress ? `${styles.selected_item}` : styles.item}>{address}</div>
+          {showSuggestion && searchSuggestions && searchSuggestions.data && searchSuggestions.data.location && searchSuggestions.data.location.address && (
+            searchSuggestions.data.location.address.map((address, i) => {
+              return <div onClick={handleSuggestionClick} key={searchSuggestions.data.location.placeId[i]} data-latitude={searchSuggestions.data.location.latitude[i]} data-longitude={searchSuggestions.data.location.longitude[i]} className={address === selectedAddress.value ? `${styles.selected_item}` : styles.item}>{address}</div>
             })
           )}
         </div>
       </div>
-      {error && <div className={styles.error}>{error}</div>}
     </>
   );
 };
 
-export default Search;
+const mapStateToProps = state => {
+  return {
+    searchSuggestions: state.searchSuggestions,
+    selectedAddress: state.selectedAddress,
+  };
+};
+
+const mapDispatchToProps = {
+  fetchSearchSuggestion,
+  fetchWeatherDetail,
+  clickAddressAction,
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(Search);
