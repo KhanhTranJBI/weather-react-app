@@ -23,7 +23,7 @@ const Search = props => {
   
   useEffect(() => {
     setTimeout(() => {
-      if (searchString === inputRef.current.value) {
+      if (searchString !== '' && searchString === inputRef.current.value) {
         fetchSearchSuggestion(searchString);
         setShowSuggestion(true);
       }
